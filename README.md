@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="Image/Icon.png" alt="CONSTANT App Icon" width="60">
+  <img src="Image/Icon.ico" alt="CONSTANT App Icon" width="60">
 </p>
 
 <h1 align="center">CONSTANT</h1>
