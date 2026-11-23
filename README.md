@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="Image/Banner.png" alt="CONSTANT Banner" width="300%">
+  <img src="assets/Banner.png" alt="CONSTANT Banner" width="300%">
 </p>
 
 <p align="center">
-  <img src="Image/Icon.ico" alt="CONSTANT App Icon" width="60">
+  <img src="assets/Icon.ico" alt="CONSTANT App Icon" width="60">
 </p>
 
 <h1 align="center">CONSTANT</h1>
