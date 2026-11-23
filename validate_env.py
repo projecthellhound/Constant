@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Habit OS — Comprehensive Environment & Dependency Validation Tool
+Constant — Comprehensive Environment & Dependency Validation Tool
 Validates Python, Pip, Node.js, npm, Ollama, TypeScript, Vite, and Electron.
 Prints clear PASS / WARN / FAIL results.
 """

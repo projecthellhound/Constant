@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Habit OS — Professional Installation & Setup Script
+# Constant — Professional Installation & Setup Script
 # Performs system prerequisite detection, dependency installation,
 # static bundle compilation, and CLI command registration.
 # ==============================================================================
@@ -22,7 +22,7 @@ cd "$SCRIPT_DIR"
 print_header() {
     echo -e "${BOLD}${CYAN}"
     echo "===================================================================="
-    echo "       HABIT OS — INSTALLATION & SYSTEM INITIALIZATION"
+    echo "       CONSTANT — INSTALLATION & SYSTEM INITIALIZATION"
     echo "===================================================================="
     echo -e "${NC}"
 }
@@ -62,20 +62,23 @@ main() {
     echo -e "\n${BOLD}[5/6] Building Production Bundle...${NC}"
     npm run build
 
-    echo -e "\n${BOLD}[6/6] Registering Terminal Executable 'Habit'...${NC}"
-    chmod +x bin/Habit
+    echo -e "\n${BOLD}[6/6] Registering the Constant launcher...${NC}"
+    chmod +x bin/constant bin/Habit desktop/register-launcher.sh
     USER_BIN="$HOME/.local/bin"
     mkdir -p "$USER_BIN"
-    ln -sf "$SCRIPT_DIR/bin/Habit" "$USER_BIN/Habit"
+    ln -sf "$SCRIPT_DIR/bin/constant" "$USER_BIN/constant"
+    ln -sf "$SCRIPT_DIR/bin/Habit" "$USER_BIN/Habit"   # legacy alias
+    if [ "$(uname -s)" = "Linux" ]; then bash "$SCRIPT_DIR/desktop/register-launcher.sh"; fi
 
     if [ -w "/usr/local/bin" ]; then
-        ln -sf "$SCRIPT_DIR/bin/Habit" "/usr/local/bin/Habit" 2>/dev/null || true
+        ln -sf "$SCRIPT_DIR/bin/constant" "/usr/local/bin/constant" 2>/dev/null || true
     fi
 
     echo -e "\n${GREEN}${BOLD}===================================================================="
-    echo "  ✓ HABIT OS INSTALLED SUCCESSFULLY!"
+    echo "  ✓ CONSTANT INSTALLED SUCCESSFULLY!"
     echo "===================================================================="
-    echo -e "  - Launch via Terminal:   ${CYAN}Habit${NC}"
+    echo -e "  - Launch from menu:     ${CYAN}Constant${NC} (application menu / desktop icon)"
+    echo -e "  - Launch via Terminal:   ${CYAN}constant${NC}"
     echo -e "  - Launch Web Mode:       ${CYAN}npm run dev${NC}"
     echo -e "  - Launch Desktop App:   ${CYAN}npm run electron:dev${NC}"
     echo -e "  - Run System Doctor:    ${CYAN}./doctor.sh${NC}"

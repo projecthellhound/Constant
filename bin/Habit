@@ -1,25 +1,4 @@
 #!/usr/bin/env bash
-# Habit OS CLI Entry Point Launcher
-# Resolves canonical repository location regardless of symlink origin
-
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
-cd "$PROJECT_ROOT" || {
-    echo "[!] Error: Could not change directory to project root: $PROJECT_ROOT"
-    exit 1
-}
-
-if [ ! -f "$PROJECT_ROOT/dist/index.html" ]; then
-    echo "[*] Initializing Habit OS production static bundle..."
-    npm run build >/dev/null 2>&1
-fi
-
-echo "[✓] Launching Habit OS Personal Productivity Workstation..."
-exec npx electron "$PROJECT_ROOT/electron/main.js" "$@"
+# Backward-compatible alias: `Habit` now starts Constant.
+SOURCE="${BASH_SOURCE[0]}"; while [ -h "$SOURCE" ]; do SOURCE="$(readlink "$SOURCE")"; done
+exec "$(cd -P "$(dirname "$SOURCE")" && pwd)/constant" "$@"

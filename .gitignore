@@ -25,6 +25,9 @@ Thumbs.db
 .vscode/
 .idea/
 
-
+node_modules
+dist
+dist_electron
+*.egg-info
 *.zip
 CONSTANT_Backup_*.json

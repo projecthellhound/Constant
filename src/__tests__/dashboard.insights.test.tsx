@@ -29,14 +29,15 @@ describe('Dashboard', () => {
   it('renders greeting, four overview cards and every panel from the spec', async () => {
     render(<DashboardView setActiveTab={() => {}} />);
     expect(await screen.findByText(/Rithish!/)).toBeTruthy();
-    expect(screen.getByText('Your day, clearly in view.')).toBeTruthy();
-    for (const t of [/Today's Progress/, /^Habits$/, /^Tasks$/, /Focus Time/, /Next up/, /Habit Consistency/, /Task Overview/, /Financial Snapshot/, /Recent Notes/]) expect(screen.getAllByText(t).length).toBeGreaterThan(0);
+    expect(screen.getByText(/complete overview/)).toBeTruthy();
+    for (const t of [/Today's Progress/, /^Habits$/, /^Tasks$/, /Focus Time/, /Next Up/, /Habit Consistency/, /Task Overview/, /Financial Snapshot/, /Today's Schedule/, /^Calendar$/, /Workspace \/ Projects/, /Smart Insights/]) expect(screen.getAllByText(t).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Add Task/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Add Habit/ })).toBeTruthy();
-    expect(await screen.findByText('$2,480.00')).toBeTruthy();   // income
-    expect(screen.getByText('$1,120.00')).toBeTruthy();          // spending
-    expect(screen.getByText('$1,360.00')).toBeTruthy();          // savings
-    expect(screen.getByText(/Productivity tips for deep work/)).toBeTruthy();
+    expect((await screen.findAllByText('$2,480.00')).length).toBeGreaterThan(0);   // income
+    expect(screen.getAllByText('$1,120.00').length).toBeGreaterThan(0);          // expenses
+    expect(screen.getByText('$1,360.00')).toBeTruthy();                           // current balance
+    expect(screen.getByText(/Productivity tips for deep work/)).toBeTruthy(); // latest note in Workspace panel
+    expect(document.querySelector('.dash')).toBeTruthy(); // single-screen Home grid
   });
 
   it('completing a schedule row writes a timestamped habit log', async () => {
@@ -50,7 +51,7 @@ describe('Dashboard', () => {
     render(<DashboardView setActiveTab={go} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Start focus session' }));
     expect(await screen.findByRole('button', { name: 'Pause focus session' })).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: /View Calendar/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Calendar →/ })[0]);
     expect(go).toHaveBeenCalledWith('calendar');
   });
 });

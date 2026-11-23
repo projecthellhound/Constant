@@ -10,7 +10,7 @@ import { endSession } from '../auth/account';
 interface SidebarProps { activeTab: ActiveTab; setActiveTab: (tab: ActiveTab) => void; onSignOut?: () => void }
 
 const SECTIONS: { label: string; items: { id: ActiveTab; label: string; icon: LucideIcon }[] }[] = [
-  { label: 'Overview', items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
+  { label: 'Overview', items: [{ id: 'dashboard', label: 'Home', icon: LayoutDashboard }] },
   { label: 'Plan & Track', items: [{ id: 'habits', label: 'Habits', icon: CalendarDays }, { id: 'dolist', label: 'To-Do List', icon: ListChecks }, { id: 'calendar', label: 'Calendar', icon: Calendar }] },
   { label: 'Manage', items: [{ id: 'finance', label: 'Finance', icon: DollarSign }, { id: 'workspace', label: 'Workspace', icon: Layers }] },
   { label: 'Insights', items: [{ id: 'analytics', label: 'Analytics', icon: BarChart2 }, { id: 'insights', label: 'Smart Insights', icon: Sparkles }] },
@@ -42,13 +42,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onSig
   };
 
   return (
-    <aside className="dynamic-sidebar" aria-label="Primary" data-collapsed={collapsed ? 'true' : 'false'} style={{ width: collapsed ? 76 : 264, padding: collapsed ? '1.5rem 0.6rem 1.25rem' : '1.5rem 1rem 1.25rem', position: 'sticky', top: 0, height: '100vh', flexShrink: 0, zIndex: 80, gap: '1.5rem', transition: 'width 180ms ease' }}>
+    <aside className="dynamic-sidebar" aria-label="Primary" data-collapsed={collapsed ? 'true' : 'false'} style={{ width: collapsed ? 84 : 308, padding: collapsed ? '1.5rem 0.7rem 1.25rem' : '1.6rem 1.15rem 1.3rem', position: 'sticky', top: 0, height: '100vh', flexShrink: 0, zIndex: 80, gap: '1.6rem', transition: 'width 180ms ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', gap: '0.5rem', padding: collapsed ? 0 : '0 0.5rem', minHeight: 40 }}>
         {!collapsed && <Brand />}
         <button type="button" className="btn btn-secondary btn-icon" onClick={toggleCollapsed} aria-label={collapsed ? 'Expand sidebar' : 'Minimize sidebar'} aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Minimize sidebar'} style={{ flex: 'none' }}>{collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
       </div>
 
-      <nav aria-label="Modules" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: 2 }}>
+      <nav aria-label="Modules" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: 2 }}>
         {SECTIONS.map((sec) => (
           <div key={sec.label} role="group" aria-label={sec.label} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             {collapsed
@@ -68,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onSig
 
         <div style={{ display: 'flex', flexDirection: collapsed ? 'column' : 'row', alignItems: 'center', gap: '0.7rem', padding: '0.6rem 0.5rem', borderTop: '1px solid var(--divider)' }}>
           <button type="button" className="sidebar-nav-item" onClick={() => setActiveTab('settings')} aria-current={activeTab === 'settings' ? 'page' : undefined} title={collapsed ? `${name} · Settings` : undefined} aria-label={collapsed ? 'Settings' : undefined} style={{ padding: '0.55rem 0.6rem', flex: collapsed ? 'none' : 1, minWidth: 0, justifyContent: collapsed ? 'center' : undefined, background: activeTab === 'settings' ? 'var(--accent-primary)' : 'transparent', color: activeTab === 'settings' ? 'var(--text-on-accent)' : 'var(--text-primary)' }}>
-            <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: '50%', background: activeTab === 'settings' ? 'var(--text-on-accent)' : 'var(--accent-primary)', color: activeTab === 'settings' ? 'var(--accent-primary)' : 'var(--text-on-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flex: 'none' }}>{name.charAt(0).toUpperCase()}</span>
+            <span aria-hidden="true" style={{ width: 36, height: 36, overflow: 'hidden', borderRadius: '50%', background: activeTab === 'settings' ? 'var(--text-on-accent)' : 'var(--accent-primary)', color: activeTab === 'settings' ? 'var(--accent-primary)' : 'var(--text-on-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flex: 'none' }}>{settings?.avatar ? <img src={settings.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : name.charAt(0).toUpperCase()}</span>
             {!collapsed && <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.2 }}>
               <span style={{ fontWeight: 600, fontSize: '0.86rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
               <span style={{ fontSize: '0.7rem', opacity: 0.8, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Settings size={11} aria-hidden="true" /> Settings & AI</span>

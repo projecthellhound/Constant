@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
-import { AlertCircle, Bell, CheckCircle2, Download, KeyRound, Palette, Sparkles, Trash2, Upload, User, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, KeyRound, Palette, Sparkles, Trash2, Upload, User, X } from 'lucide-react';
 import { NotificationSettings } from '../notifications/NotificationSettings';
 import { db } from '../db/schema';
 import { AppearanceSection } from '../theme/AppearanceSection';
@@ -19,7 +19,6 @@ const SECTIONS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Profile', icon: <User size={16} /> },
   { id: 'ai', label: 'AI Configuration', icon: <Sparkles size={16} /> },
   { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
-  { id: 'notifications', label: 'Notifications', icon: <Bell size={16} /> },
 ];
 const GENDERS = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to say'];
 
@@ -33,8 +32,15 @@ export const SettingsView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [dob, setDob] = useState('');
   const [bio, setBio] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [stateRegion, setStateRegion] = useState('');
+  const [country, setCountry] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  useEffect(() => { if (settings) { setName(settings.userName || ''); setGender(settings.gender || ''); setEmail(settings.email || ''); setDob(settings.dob || ''); setBio(settings.bio || ''); } }, [settings?.userName, settings?.gender, settings?.email, settings?.dob, settings?.bio]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (settings) { setName(settings.userName || ''); setGender(settings.gender || ''); setEmail(settings.email || ''); setDob(settings.dob || ''); setBio(settings.bio || ''); setPhone(settings.phone || ''); setAddress(settings.address || ''); setCity(settings.city || ''); setStateRegion(settings.state || ''); setCountry(settings.country || ''); setOccupation(settings.occupation || ''); setAvatar(settings.avatar || ''); } }, [settings?.id, settings?.userName, settings?.gender, settings?.email, settings?.dob, settings?.bio, settings?.phone, settings?.address, settings?.city, settings?.state, settings?.country, settings?.occupation, settings?.avatar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // password form
   const [curPw, setCurPw] = useState('');
@@ -56,8 +62,35 @@ export const SettingsView: React.FC = () => {
     if (!name.trim()) return setProfileMsg({ ok: false, text: 'Name is required.' });
     if (!isValidEmail(email)) return setProfileMsg({ ok: false, text: 'Enter a valid email address.' });
     if (dob && (dob > today || dob < '1900-01-01')) return setProfileMsg({ ok: false, text: 'Enter a valid date of birth.' });
-    await db.settings.update('default', { userName: name.trim(), gender, email: email.trim(), dob, bio: bio.trim().slice(0, 280) });
+    if (phone && !/^[+()\d\s.-]{6,20}$/.test(phone.trim())) return setProfileMsg({ ok: false, text: 'Enter a valid phone number.' });
+    await db.settings.update('default', { userName: name.trim(), gender, email: email.trim(), dob, bio: bio.trim().slice(0, 500), phone: phone.trim(), address: address.trim(), city: city.trim(), state: stateRegion.trim(), country: country.trim(), occupation: occupation.trim(), avatar });
     setProfileMsg({ ok: true, text: 'Profile saved.' });
+  };
+
+  const onAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; e.target.value = '';
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|webp)$/.test(f.type)) return setProfileMsg({ ok: false, text: 'Choose a PNG, JPEG or WebP image.' });
+    if (f.size > 8 * 1024 * 1024) return setProfileMsg({ ok: false, text: 'Image is too large (max 8 MB).' });
+    const url = URL.createObjectURL(f); const img = new Image();
+    img.onload = () => {
+      const size = 256; const c = document.createElement('canvas'); c.width = size; c.height = size;
+      const ctx = c.getContext('2d'); if (!ctx) return;
+      const side = Math.min(img.width, img.height); ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+      setAvatar(c.toDataURL('image/jpeg', 0.85)); setProfileMsg(null); URL.revokeObjectURL(url);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); setProfileMsg({ ok: false, text: 'That image could not be read.' }); };
+    img.src = url;
+  };
+  const avatarRef = useRef<HTMLInputElement | null>(null);
+
+  // change-password flow: 1) confirm current password, 2) choose a new one
+  const [pwStep, setPwStep] = useState<'closed' | 'current' | 'new'>('closed');
+  const closePw = () => { setPwStep('closed'); setCurPw(''); setNewPw(''); setConfPw(''); };
+  const verifyCurrent = async (e: React.FormEvent) => {
+    e.preventDefault(); setPwMsg(null);
+    if (!(await checkPassword(curPw))) return setPwMsg({ ok: false, text: 'Current password is incorrect.' });
+    setPwStep('new');
   };
 
   const savePassword = async (e: React.FormEvent) => {
@@ -69,7 +102,7 @@ export const SettingsView: React.FC = () => {
     if (newPw === curPw) return setPwMsg({ ok: false, text: 'Choose a password different from the current one.' });
     const ok = await changePassword(curPw, newPw);
     if (!ok) return setPwMsg({ ok: false, text: 'Current password is incorrect.' });
-    setCurPw(''); setNewPw(''); setConfPw('');
+    closePw();
     setPwMsg({ ok: true, text: 'Password updated.' });
   };
 
@@ -122,36 +155,64 @@ export const SettingsView: React.FC = () => {
 
       {section === 'ai' && <AIEnginePanel />}
       {section === 'appearance' && <AppearanceSection />}
-      {section === 'notifications' && <NotificationSettings />}
 
       {section === 'profile' && (<>
         <section className="liquid-panel" aria-label="Profile details">
           <h3 className="panel-title" style={{ marginBottom: 4 }}><User size={18} /> Profile details</h3>
           <p className="subtitle" style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>This information is stored only on this device.</p>
           <form onSubmit={saveProfile} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-              <div className="form-group"><label className="form-label" htmlFor="p-name">Name</label><input id="p-name" className="form-input" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} /></div>
-              <div className="form-group"><label className="form-label" htmlFor="p-gender">Gender</label><select id="p-gender" className="form-select" value={gender} onChange={(e) => setGender(e.target.value)}>{GENDERS.map((g) => <option key={g} value={g}>{g || 'Select…'}</option>)}</select></div>
-              <div className="form-group"><label className="form-label" htmlFor="p-email">Email address</label><input id="p-email" className="form-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-              <div className="form-group"><label className="form-label" htmlFor="p-dob">Date of birth</label><input id="p-dob" className="form-input" type="date" max={today} min="1900-01-01" value={dob} onChange={(e) => setDob(e.target.value)} /></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', flexWrap: 'wrap' }}>
+              <div aria-label="Profile picture" role="img" style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flex: 'none', background: 'var(--accent-soft)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 700, border: '2px solid var(--border-color)' }}>
+                {avatar ? <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (name.trim().charAt(0).toUpperCase() || <User size={34} />)}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-secondary btn-xs" onClick={() => avatarRef.current?.click()}><Upload size={14} /> {avatar ? 'Change picture' : 'Upload picture'}</button>
+                  {avatar && <button type="button" className="btn btn-secondary btn-xs" onClick={() => setAvatar('')}><Trash2 size={14} /> Remove</button>}
+                </div>
+                <span className="subtitle" style={{ fontSize: '0.76rem' }}>PNG, JPEG or WebP. Resized and kept on this device only.</span>
+                <input ref={avatarRef} type="file" accept="image/png,image/jpeg,image/webp" hidden aria-label="Profile picture file" onChange={onAvatar} />
+              </div>
             </div>
-            <div className="form-group"><label className="form-label" htmlFor="p-bio">Short description</label><textarea id="p-bio" className="form-textarea" rows={3} maxLength={280} placeholder="A line or two about you" value={bio} onChange={(e) => setBio(e.target.value)} /><span className="subtitle num" style={{ fontSize: '0.72rem', alignSelf: 'flex-end' }}>{bio.length}/280</span></div>
+            <div className="profile-grid">
+              <div className="form-group"><label className="form-label" htmlFor="p-name">Full name</label><input id="p-name" className="form-input" maxLength={60} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-dob">Date of birth</label><input id="p-dob" className="form-input" type="date" max={today} min="1900-01-01" value={dob} onChange={(e) => setDob(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-gender">Gender</label><select id="p-gender" className="form-select" value={gender} onChange={(e) => setGender(e.target.value)}>{GENDERS.map((g) => <option key={g} value={g}>{g || 'Select…'}</option>)}</select></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-email">Email address</label><input id="p-email" className="form-input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-phone">Phone number</label><input id="p-phone" className="form-input" type="tel" autoComplete="tel" maxLength={20} placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-occ">Occupation / profession</label><input id="p-occ" className="form-input" maxLength={80} value={occupation} onChange={(e) => setOccupation(e.target.value)} /></div>
+              <div className="form-group profile-wide"><label className="form-label" htmlFor="p-address">Residential address</label><input id="p-address" className="form-input" maxLength={160} autoComplete="street-address" value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-city">City</label><input id="p-city" className="form-input" maxLength={60} autoComplete="address-level2" value={city} onChange={(e) => setCity(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-state">State / region</label><input id="p-state" className="form-input" maxLength={60} autoComplete="address-level1" value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="p-country">Country</label><input id="p-country" className="form-input" maxLength={60} autoComplete="country-name" value={country} onChange={(e) => setCountry(e.target.value)} /></div>
+              <div className="form-group profile-wide"><label className="form-label" htmlFor="p-bio">Personal biography</label><textarea id="p-bio" className="form-textarea" rows={3} maxLength={500} placeholder="A few lines about you" value={bio} onChange={(e) => setBio(e.target.value)} /><div className="subtitle" style={{ fontSize: '0.72rem', textAlign: 'right' }}>{bio.length}/500</div></div>
+            </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><button type="submit" className="btn btn-primary">Save profile</button><Msg m={profileMsg} /></div>
           </form>
+
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.1rem', borderTop: '1px solid var(--divider)' }} aria-label="Change password">
+            <h4 className="panel-title" style={{ fontSize: '0.95rem', marginBottom: 4 }}><KeyRound size={16} /> Password</h4>
+            {pwStep === 'closed' && (<div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => { setPwMsg(null); setPwStep('current'); }}><KeyRound size={15} /> Change password</button><Msg m={pwMsg} />
+              <span className="subtitle" style={{ fontSize: '0.78rem' }}>Passwords are stored as a salted hash, never in plain text.</span>
+            </div>)}
+            {pwStep === 'current' && (
+              <form onSubmit={verifyCurrent} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', maxWidth: 420 }}>
+                <div className="form-group"><label className="form-label" htmlFor="pw-cur">Current password</label><input id="pw-cur" className="form-input" type="password" autoComplete="current-password" autoFocus value={curPw} onChange={(e) => setCurPw(e.target.value)} /></div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><button type="submit" className="btn btn-primary" disabled={!curPw}>Continue</button><button type="button" className="btn btn-secondary" onClick={closePw}>Cancel</button><Msg m={pwMsg} /></div>
+              </form>
+            )}
+            {pwStep === 'new' && (
+              <form onSubmit={savePassword} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', maxWidth: 420 }}>
+                <div className="form-group"><label className="form-label" htmlFor="pw-new">New password</label><input id="pw-new" className="form-input" type="password" autoComplete="new-password" autoFocus value={newPw} onChange={(e) => setNewPw(e.target.value)} /></div>
+                <div className="form-group"><label className="form-label" htmlFor="pw-conf">Confirm new password</label><input id="pw-conf" className="form-input" type="password" autoComplete="new-password" value={confPw} onChange={(e) => setConfPw(e.target.value)} /></div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><button type="submit" className="btn btn-primary" disabled={!newPw}>Update password</button><button type="button" className="btn btn-secondary" onClick={closePw}>Cancel</button><Msg m={pwMsg} /></div>
+              </form>
+            )}
+          </div>
         </section>
 
-        <section className="liquid-panel" aria-label="Change password">
-          <h3 className="panel-title" style={{ marginBottom: 4 }}><KeyRound size={18} /> Password</h3>
-          <p className="subtitle" style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>Passwords are stored as a salted hash, never in plain text.</p>
-          <form onSubmit={savePassword} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-              <div className="form-group"><label className="form-label" htmlFor="pw-cur">Current password</label><input id="pw-cur" className="form-input" type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)} /></div>
-              <div className="form-group"><label className="form-label" htmlFor="pw-new">New password</label><input id="pw-new" className="form-input" type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} /></div>
-              <div className="form-group"><label className="form-label" htmlFor="pw-conf">Confirm new password</label><input id="pw-conf" className="form-input" type="password" autoComplete="new-password" value={confPw} onChange={(e) => setConfPw(e.target.value)} /></div>
-            </div>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><button type="submit" className="btn btn-primary" disabled={!curPw || !newPw}>Update password</button><Msg m={pwMsg} /></div>
-          </form>
-        </section>
+        <NotificationSettings />
 
         <section className="liquid-panel" aria-label="Database operations">
           <h3 className="panel-title" style={{ marginBottom: 4 }}>Database operations</h3>

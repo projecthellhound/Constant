@@ -1,4 +1,4 @@
-# Habit OS - Automated CLI Setup Dependencies
+# Constant - Automated CLI Setup Dependencies
 # Note: If invoking directly, use: python3 -m pip install -r requirements.txt
 requests>=2.31.0
 colorama>=0.4.6

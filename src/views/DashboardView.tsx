@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format, subDays, startOfMonth, endOfMonth, subMonths, parseISO, isSameDay } from 'date-fns';
-import { Calendar, CheckSquare, Clock, Leaf, Plus, Zap, ChevronRight, FileText, Play, Pause, Check, MoreHorizontal, TrendingUp, Square } from 'lucide-react';
+import { Calendar, CheckSquare, Clock, Leaf, Plus, Zap, ChevronRight, FileText, Check, TrendingUp, Square, Play, Pause } from 'lucide-react';
 import { db, Habit, Task } from '../db/schema';
 import { ActiveTab } from '../App';
 import { AddHabitModal } from '../components/AddHabitModal';
@@ -28,6 +28,23 @@ const STATUS_CHIP: Record<Row['status'], { text: string; cls: string } | null> =
   completed: { text: 'Completed', cls: 'chip-success' }, in_progress: { text: 'In Progress', cls: 'chip-warning' },
   high: { text: 'High', cls: 'chip-danger' }, medium: { text: 'Medium', cls: 'chip-warning' }, low: { text: 'Low', cls: 'chip-info' }, open: null,
 };
+
+const Panel: React.FC<{ go: (t: ActiveTab) => void; icon: React.ReactNode; title: string; sub?: string; action?: { label: string; to: ActiveTab }; right?: React.ReactNode; children: React.ReactNode; label: string }> = ({ go, icon, title, sub, action, right, children, label }) => (
+  <section className="liquid-panel dash-panel" aria-label={label}>
+    <header className="dash-panel-head">
+      <div style={{ minWidth: 0 }}><h3 className="dash-panel-title">{icon}{title}</h3>{sub && <div className="subtitle dash-sub">{sub}</div>}</div>
+      {right}{action && <button type="button" className="link-action" onClick={() => go(action.to)}>{action.label} →</button>}
+    </header>
+    <div className="dash-panel-body">{children}</div>
+  </section>
+);
+const KPI: React.FC<{ icon: React.ReactNode; title: string; value: React.ReactNode; foot: React.ReactNode; label: string }> = ({ icon, title, value, foot, label }) => (
+  <div className="liquid-panel dash-kpi" aria-label={label}>
+    <span className="dash-kpi-icon">{icon}</span>
+    <div style={{ minWidth: 0 }}><strong>{title}</strong><div className="num dash-kpi-value">{value}</div>{foot}</div>
+  </div>
+);
+
 
 export const DashboardView: React.FC<Props> = ({ setActiveTab }) => {
   const habitsAll = useLiveQuery(() => db.habits.where('archived').equals(0).toArray()) || [];
@@ -121,166 +138,157 @@ export const DashboardView: React.FC<Props> = ({ setActiveTab }) => {
     };
   }, [habits, logs, tasks, doItems, txs, today, yesterday]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const latestNote = [...notes].filter((n) => n.kind !== 'wishlist').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   const focusToday = minutesOn(focus.sessions, today);
   const focusDelta = focusToday - minutesOn(focus.sessions, yesterday);
-  const nextUp = data.rows.filter((r) => !r.done && r.minutes !== null && r.minutes >= nowMinutes).slice(0, 3);
-  const latestNote = [...notes].filter((n) => n.kind !== 'wishlist').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  const activeMin = focus.active ? Math.floor(focus.elapsedMs / 60000) : 0;
-  const activeSec = focus.active ? Math.floor((focus.elapsedMs % 60000) / 1000) : 0;
+  const nextUp = data.rows.filter((r) => !r.done && r.minutes !== null && r.minutes >= nowMinutes).slice(0, 4);
+  const sched = data.rows.filter((r) => r.key.startsWith('h-') || r.key.startsWith('t-') || r.key.startsWith('d-'));
 
-  const bar = (done: number, total: number, color: string) => (
-    <div className="progress-bar-track" style={{ height: 8 }} role="progressbar" aria-valuenow={done} aria-valuemin={0} aria-valuemax={total || 1}>
-      <div style={{ width: total ? `${(done / total) * 100}%` : 0, height: '100%', background: color, borderRadius: 999 }} />
-    </div>
-  );
+  // ---- extra data for the Home grid ----
+  const projects = useLiveQuery(() => db.projects.toArray()) || [];
+  const extra = useMemo(() => {
+    const dayPct = (d: Date) => { const ds = format(d, 'yyyy-MM-dd'); const n = habits.filter((h) => logs.some((l) => l.habitId === h.id && l.date === ds && l.status === 'completed')).length; return habits.length ? Math.round((n / habits.length) * 100) : 0; };
+    const week = Array.from({ length: 7 }, (_, i) => { const d = subDays(now, 6 - i); return { d, pct: dayPct(d) }; });
+    const avg = Math.round(week.reduce((a, w) => a + w.pct, 0) / 7);
+    const best = week.reduce((b, w) => (w.pct > b.pct ? w : b), week[0]);
+    let streak = 0; for (let i = 0; i < 365; i++) { if (dayPct(subDays(now, i)) > 0) streak++; else if (i > 0) break; else continue; }
+    const st = (f: (t: Task) => boolean) => tasks.filter((t) => t.status !== 'cancelled' && f(t)).length;
+    const tstat = {
+      completed: st((t) => t.status === 'completed'), progress: st((t) => t.status === 'in_progress'),
+      pending: st((t) => !['completed', 'in_progress'].includes(t.status)), dueToday: st((t) => t.dueDate === today && t.status !== 'completed'),
+      overdue: st((t) => !!t.dueDate && t.dueDate < today && t.status !== 'completed'),
+    };
+    const balance = txs.reduce((a, x) => a + (x.type === 'income' ? x.amount : x.type === 'expense' ? -x.amount : 0), 0);
+    const marked = new Set<string>(); tasks.forEach((t) => t.dueDate && marked.add(t.dueDate)); doItems.forEach((i) => i.scheduledDate && marked.add(i.scheduledDate));
+    const proj = projects.filter((p) => ['active', 'planning'].includes(p.status)).slice(0, 3).map((p) => {
+      const pt = tasks.filter((t) => t.projectId === p.id && t.status !== 'cancelled'); const done = pt.filter((t) => t.status === 'completed').length;
+      return { p, pct: pt.length ? Math.round((done / pt.length) * 100) : 0 };
+    });
+    const insights = [
+      data.progress < 30 ? { k: 'Build Momentum', t: 'Complete 2–3 key habits to reach ≥30% today.', icon: <Zap size={16} /> } : { k: 'Great Momentum', t: `You are at ${data.progress}% today. Keep it up!`, icon: <Zap size={16} /> },
+      { k: 'Maintain Consistency', t: `Your weekly average is ${avg}%. Aim for ≥60%.`, icon: <TrendingUp size={16} /> },
+      focusToday === 0 ? { k: 'Focus Opportunity', t: 'No focus time logged yet. Try a 25-min session.', icon: <Clock size={16} /> } : { k: 'Focus Logged', t: `${formatMinutes(focusToday)} of focus today.`, icon: <Clock size={16} /> },
+      data.tasksTotal === 0 ? { k: 'Plan Ahead', t: 'You have no tasks today. Add key tasks or goals.', icon: <Calendar size={16} /> } : { k: 'Stay on Tasks', t: `${data.tasksTotal - data.tasksDone} task(s) still open today.`, icon: <CheckSquare size={16} /> },
+    ];
+    return { week, avg, best, streak, tstat, balance, marked, proj, insights };
+  }, [habits, logs, tasks, doItems, txs, projects, today, data.progress, data.tasksTotal, data.tasksDone, focusToday]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [calMonth, setCalMonth] = useState(() => startOfMonth(new Date()));
+  const monthDays = useMemo(() => { const first = startOfMonth(calMonth); const lead = first.getDay(); const n = endOfMonth(calMonth).getDate(); return [...Array(lead).fill(null), ...Array.from({ length: n }, (_, i) => new Date(calMonth.getFullYear(), calMonth.getMonth(), i + 1))] as (Date | null)[]; }, [calMonth]);
 
   return (
-    <div className="view-container">
-      {/* 1. Header */}
-      <div className="view-header" style={{ alignItems: 'center' }}>
-        <div>
-          <h1 className="view-header-title">{greeting}, {userName}!</h1>
-          <p className="view-header-subtitle">Your day, clearly in view.</p>
+    <div className="dash">
+      <div className="dash-top">
+        <div style={{ minWidth: 0 }}>
+          <h1 className="dash-greet">{greeting}, {userName}!</h1>
+          <p className="subtitle" style={{ fontSize: '0.88rem' }}>Here's your complete overview — habits, tasks, focus, finance, projects and insights in one place.</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.6rem' }}>
-          <button className="btn btn-secondary" onClick={() => setTaskModal(true)}><Plus size={16} /> Add Task</button>
-          <button className="btn btn-primary" onClick={() => setHabitModal(true)}><Leaf size={16} /> Add Habit</button>
-        </div>
-      </div>
-
-      {/* 2. Daily overview */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
-        <div className="liquid-panel" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <ProgressRing pct={data.progress} size={76} />
-          <div><strong style={{ fontSize: '1rem' }}>Today's Progress</strong><div className="subtitle" style={{ fontSize: '0.8rem' }}>{data.progress >= 60 ? "You're on track!" : 'Keep going!'}</div></div>
-        </div>
-        <div className="liquid-panel" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)' }}><Leaf size={24} /></span>
-          <div><strong>Habits</strong><div className="num" style={{ fontSize: '1.05rem', fontWeight: 600 }}>{data.habitsDone} / {habits.length} completed</div><Delta value={data.habitsDelta} text="from yesterday" /></div>
-        </div>
-        <div className="liquid-panel" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)' }}><CheckSquare size={24} /></span>
-          <div><strong>Tasks</strong><div className="num" style={{ fontSize: '1.05rem', fontWeight: 600 }}>{data.tasksDone} / {data.tasksTotal} completed</div><Delta value={data.tasksDoneDelta} text="from yesterday" /></div>
-        </div>
-        <div className="liquid-panel" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)' }}><Clock size={24} /></span>
-          <div><strong>Focus Time</strong><div className="num" style={{ fontSize: '1.3rem', fontWeight: 700 }}>{formatMinutes(focusToday)}</div><Delta value={focusDelta} suffix="m" text="from yesterday" /></div>
+        <div style={{ display: 'flex', gap: '0.5rem', flex: 'none' }}>
+          <button className="btn btn-secondary" onClick={() => setTaskModal(true)}><Plus size={15} /> Add Task</button>
+          <button className="btn btn-primary" onClick={() => setHabitModal(true)}><Leaf size={15} /> Add Habit</button>
         </div>
       </div>
 
-      {/* 3. Primary activity row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.75fr) minmax(0, 1fr)', gap: '1rem' }}>
-        <section className="liquid-panel" aria-label="Today's schedule">
-          <PanelHeader icon={<Calendar size={18} />} title={`Today • ${format(now, 'EEEE, MMM d, yyyy')}`} action={{ label: 'View Calendar', onClick: () => setActiveTab('calendar') }} />
-          {data.rows.length === 0 ? <p className="subtitle" style={{ padding: '1.25rem 0' }}>Nothing scheduled today. Add a habit or a task to get started.</p> : (
-            <ul style={{ listStyle: 'none' }}>
-              {data.rows.slice(0, 8).map((r) => {
-                const chip = STATUS_CHIP[r.status];
-                return (
-                  <li key={r.key} className="row-hover" style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', padding: '0.7rem 0.5rem', borderTop: '1px solid var(--divider)', borderRadius: 'var(--radius-sm)' }}>
-                    {r.partial !== undefined && !r.done
-                      ? <button type="button" aria-label={`Mark ${r.title} complete`} className="check-circle" style={{ color: 'var(--accent-primary)' }} onClick={r.toggle}><span style={{ width: 10, height: 10, borderRadius: '50%', background: `conic-gradient(var(--accent-primary) ${r.partial}%, transparent 0)` }} /></button>
-                      : <button type="button" role="checkbox" aria-checked={r.done} aria-label={`${r.done ? 'Mark incomplete' : 'Mark complete'}: ${r.title}`} className={`check-circle ${r.done ? 'is-done' : ''}`} onClick={r.toggle}>{r.done && <Check size={14} />}</button>}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, textDecoration: r.done ? 'line-through' : 'none', color: r.done ? 'var(--text-muted)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
-                      <div className="subtitle" style={{ fontSize: '0.75rem' }}>{r.category}</div>
-                    </div>
-                    <span className="num" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--text-secondary)', fontSize: '0.82rem', minWidth: 92 }}><Clock size={14} />{r.label ?? 'Anytime'}</span>
-                    <span style={{ minWidth: 86, textAlign: 'right' }}>{chip && <span className={`chip ${chip.cls}`}>{chip.text}</span>}</span>
-                    <MoreHorizontal size={16} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
-                  </li>
-                );
-              })}
+      <div className="dash-grid">
+        <KPI label="Today's progress" icon={<ProgressRing pct={data.progress} size={58} stroke={6} />} title="Today's Progress" value={<span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{data.progress >= 60 ? "You're on track!" : 'Keep going!'}</span>} foot={null} />
+        <KPI label="Habits" icon={<Leaf size={22} />} title="Habits" value={`${data.habitsDone} / ${habits.length} completed`} foot={<Delta value={data.habitsDelta} text="from yesterday" />} />
+        <KPI label="Tasks" icon={<CheckSquare size={22} />} title="Tasks" value={`${data.tasksDone} / ${data.tasksTotal} completed`} foot={<Delta value={data.tasksDoneDelta} text="from yesterday" />} />
+        <KPI label="Focus time" icon={<Clock size={22} />} title="Focus Time" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{focus.active ? `${String(Math.floor(focus.elapsedMs / 60000)).padStart(2, '0')}:${String(Math.floor((focus.elapsedMs % 60000) / 1000)).padStart(2, '0')}` : formatMinutes(focusToday)}
+          <button type="button" className="btn btn-secondary btn-icon btn-xs" onClick={focus.toggle} aria-label={focus.active?.running ? 'Pause focus session' : focus.active ? 'Continue focus session' : 'Start focus session'}>{focus.active?.running ? <Pause size={13} /> : <Play size={13} />}</button>
+          {focus.active && <button type="button" className="btn btn-secondary btn-xs" onClick={focus.finish}>Finish</button>}</span>} foot={<Delta value={focusDelta} suffix="m" text="from yesterday" />} />
+
+        <Panel go={setActiveTab} label="Today's schedule" icon={<Calendar size={17} />} title="Today's Schedule" sub="Your planned habits and tasks for today" right={<span className="chip chip-success num">{data.progress}% Done</span>} action={{ label: 'Calendar', to: 'calendar' }}>
+          {sched.length === 0 ? <p className="subtitle">Nothing scheduled today. Add a habit or a task to get started.</p> : (
+            <ul className="dash-list">
+              {sched.map((r) => (
+                <li key={r.key} className="dash-row">
+                  <button type="button" role="checkbox" aria-checked={r.done} aria-label={`${r.done ? 'Mark incomplete' : 'Mark complete'}: ${r.title}`} className={`check-circle ${r.done ? 'is-done' : ''}`} onClick={r.toggle}>{r.done && <Check size={13} />}</button>
+                  <div style={{ flex: 1, minWidth: 0 }}><div className="dash-row-title" style={{ textDecoration: r.done ? 'line-through' : 'none', color: r.done ? 'var(--text-muted)' : undefined }}>{r.title}</div><div className="subtitle dash-sub">{r.category}</div></div>
+                  <span className="num dash-time">{r.label ?? 'Anytime'}</span>
+                </li>
+              ))}
             </ul>
           )}
-        </section>
+        </Panel>
 
-        <section className="liquid-panel" aria-label="Next up">
-          <PanelHeader icon={<Zap size={18} />} title="Next up" action={{ label: 'View All', onClick: () => setActiveTab('calendar') }} />
+        <Panel go={setActiveTab} label="Next up" icon={<Zap size={17} />} title="Next Up" sub="What's coming next" action={{ label: 'All', to: 'calendar' }}>
           {nextUp.length === 0 ? <p className="subtitle">No more timed items today.</p> : (
-            <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.7rem', position: 'relative' }}>
+            <ol className="dash-list">
               {nextUp.map((r) => (
-                <li key={r.key} style={{ display: 'grid', gridTemplateColumns: '72px 12px 1fr', alignItems: 'center', gap: '0.6rem' }}>
-                  <span className="num" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{r.label}</span>
-                  <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent-primary)', justifySelf: 'center' }} />
-                  <div style={{ background: 'var(--surface-sunken)', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.8rem' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{r.title}</div>
-                    <div className="subtitle" style={{ fontSize: '0.74rem' }}>{r.category}</div>
-                  </div>
+                <li key={r.key} className="dash-row" style={{ gap: '0.6rem' }}>
+                  <span className="num dash-time" style={{ minWidth: 62 }}>{r.label}</span>
+                  <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)', flex: 'none' }} />
+                  <div className="dash-chip-row"><div className="dash-row-title">{r.title}</div><div className="subtitle dash-sub">{r.category}</div></div>
                 </li>
               ))}
             </ol>
           )}
-        </section>
-      </div>
+        </Panel>
 
-      {/* 4. Secondary analytics row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-        <section className="liquid-panel" aria-label="Habit consistency">
-          <PanelHeader icon={<TrendingUp size={18} />} title="Habit Consistency" action={{ label: 'View Details', onClick: () => setActiveTab('habits') }} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, textAlign: 'center' }}>
-            {data.week.map((w) => (
-              <div key={w.d.toISOString()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <span className="subtitle" style={{ fontSize: '0.72rem', fontWeight: 600 }}>{format(w.d, 'EEE')}</span>
-                <span className={`check-square ${w.ok ? 'is-done' : ''}`} style={{ width: 28, height: 28, cursor: 'default' }} role="img" aria-label={`${format(w.d, 'EEEE')}: ${w.ok ? 'consistent' : 'not consistent'}`}>{w.ok && <Check size={15} />}</span>
+        <Panel go={setActiveTab} label="Habit consistency" icon={<TrendingUp size={17} />} title="Habit Consistency" sub="Your habit completion trend" right={<span className="subtitle dash-sub">Last 7 Days</span>}>
+          <div className="dash-bars" role="img" aria-label="Habit completion for the last 7 days">
+            {extra.week.map((w) => (
+              <div key={w.d.toISOString()} className="dash-bar-col">
+                <div className="dash-bar-track"><div className="dash-bar-fill" style={{ height: `${Math.max(w.pct, 3)}%`, opacity: w.pct ? 1 : 0.35 }} title={`${w.pct}%`} /></div>
+                <span className="subtitle dash-sub">{format(w.d, 'EEE')}</span>
               </div>
             ))}
           </div>
-          <div className="num" style={{ marginTop: '0.9rem', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--text-secondary)' }}><Leaf size={14} />{data.okDays} of 7 days · {Math.round((data.okDays / 7) * 100)}% consistency</div>
-        </section>
+          <div className="dash-stats">
+            <div><strong className="num">{extra.avg}%</strong><span className="subtitle dash-sub">Weekly Avg.</span></div>
+            <div><strong className="num">{habits.filter((h) => logs.some((l) => l.habitId === h.id && l.date === format(extra.best.d, 'yyyy-MM-dd') && l.status === 'completed')).length} / {habits.length}</strong><span className="subtitle dash-sub">Best Day</span></div>
+            <div><strong className="num">🔥 {extra.streak}</strong><span className="subtitle dash-sub">Day Streak</span></div>
+          </div>
+        </Panel>
 
-        <section className="liquid-panel" aria-label="Task overview">
-          <PanelHeader icon={<CheckSquare size={18} />} title="Task Overview" action={{ label: 'View All', onClick: () => setActiveTab('dolist') }} />
-          {([['Critical', data.crit, 'var(--danger)'], ['Active', data.active, 'var(--warning)'], ['Completed', data.completed, 'var(--success)']] as const).map(([name, v, color]) => (
-            <div key={name} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 48px', alignItems: 'center', gap: '0.7rem', padding: '0.45rem 0' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.88rem' }}><span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: color }} />{name}</span>
-              {bar(v.done, v.total, color)}
-              <span className="num" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'right' }}>{v.done} / {v.total}</span>
-            </div>
-          ))}
-        </section>
-
-        <section className="liquid-panel" aria-label="Financial snapshot">
-          <PanelHeader icon={<Square size={18} />} title="Financial Snapshot" action={{ label: 'View Details', onClick: () => setActiveTab('finance') }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr 1px 1fr', gap: '0.75rem' }}>
-            {[['Income', data.income, data.dIncome], ['Spending', data.spend, data.dSpend], ['Savings', data.savings, data.dSave]].map(([label, val, d], i) => (
-              <React.Fragment key={label as string}>
-                {i > 0 && <span aria-hidden="true" style={{ background: 'var(--divider)' }} />}
-                <div><div className="num" style={{ fontSize: '1.35rem', fontWeight: 700 }}>{money(val as number, currency)}</div><div className="subtitle" style={{ fontSize: '0.8rem' }}>{label}</div>
-                  {d !== null && <span className="chip chip-neutral num" style={{ marginTop: 4 }}>{(d as number) >= 0 ? '↑' : '↓'} {Math.abs(d as number)}%</span>}</div>
-              </React.Fragment>
+        <Panel go={setActiveTab} label="Task overview" icon={<CheckSquare size={17} />} title="Task Overview" sub="All tasks at a glance" action={{ label: 'All', to: 'dolist' }}>
+          <div className="dash-tasklist">
+            {([['Completed', extra.tstat.completed, 'var(--success)'], ['In Progress', extra.tstat.progress, 'var(--info, var(--accent-primary))'], ['Pending', extra.tstat.pending, 'var(--text-muted)'], ['Due Today', extra.tstat.dueToday, 'var(--warning)'], ['Overdue', extra.tstat.overdue, 'var(--danger)']] as const).map(([name, n, color]) => (
+              <div key={name} className="dash-task-chip" style={{ borderLeft: `3px solid ${color}` }}><span>{name}</span><strong className="num">{n}</strong></div>
             ))}
           </div>
-          <p className="subtitle" style={{ fontSize: '0.72rem', marginTop: '0.75rem' }}>This month, compared with last month.</p>
-        </section>
-      </div>
+        </Panel>
 
-      {/* 5. Bottom productivity row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '1rem' }}>
-        <button type="button" className="liquid-panel row-hover" onClick={() => setActiveTab('workspace')} style={{ display: 'flex', alignItems: 'center', gap: '1rem', textAlign: 'left', cursor: 'pointer' }}>
-          <FileText size={22} style={{ color: 'var(--text-secondary)' }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <strong>Recent Notes</strong>
-            <div className="subtitle" style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {latestNote ? `${latestNote.title || 'Untitled'}${latestNote.tags?.[0] ? ` #${latestNote.tags[0].replace(/^#/, '')}` : ''}` : 'No notes yet. Open Workspace to write one.'}
-            </div>
+        <Panel go={setActiveTab} label="Financial snapshot" icon={<Square size={17} />} title="Financial Snapshot" sub="Your financial overview" action={{ label: 'Finance', to: 'finance' }} right={<span className="subtitle dash-sub">This Month</span>}>
+          <div className="dash-balance"><div className="subtitle dash-sub">Current Balance</div><div className="num dash-balance-value">{money(extra.balance, currency)}</div>{data.dSave !== null && <span className="subtitle dash-sub">{data.dSave >= 0 ? '↑' : '↓'} {Math.abs(data.dSave)}% savings vs last month</span>}</div>
+          <div className="dash-two">
+            <div className="dash-mini"><span className="subtitle dash-sub">Income</span><strong className="num">{money(data.income, currency)}</strong></div>
+            <div className="dash-mini"><span className="subtitle dash-sub">Expenses</span><strong className="num">{money(data.spend, currency)}</strong></div>
           </div>
-          {latestNote && <span className="subtitle num" style={{ fontSize: '0.78rem' }}>{relativeTime(latestNote.updatedAt)}</span>}
-          <ChevronRight size={18} aria-hidden="true" />
-        </button>
+          <div className="progress-bar-track" style={{ height: 6, marginTop: 8 }}><div style={{ width: `${data.income ? Math.min(100, (data.spend / data.income) * 100) : 0}%`, height: '100%', background: 'var(--accent-primary)', borderRadius: 999 }} /></div>
+          <div className="subtitle dash-sub" style={{ marginTop: 4 }}>Spent: {data.income ? Math.round((data.spend / data.income) * 100) : 0}% of income</div>
+        </Panel>
 
-        <div className="liquid-panel" style={{ background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', color: 'var(--text-on-accent)', display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
-          <button type="button" onClick={focus.toggle} aria-label={focus.active?.running ? 'Pause focus session' : focus.active ? 'Continue focus session' : 'Start focus session'} style={{ background: 'transparent', border: '2px solid currentColor', borderRadius: '50%', width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'inherit' }}>
-            {focus.active?.running ? <Pause size={18} /> : <Play size={18} />}
-          </button>
-          <div style={{ flex: 1 }}>
-            <strong>{focus.active ? (focus.active.running ? 'Focus Session Running' : 'Continue Focus Session') : 'Start Focus Session'}</strong>
-            <div className="num" style={{ fontSize: '0.82rem', opacity: 0.9 }}>
-              {focus.active ? `${String(activeMin).padStart(2, '0')}:${String(activeSec).padStart(2, '0')} of ${focus.active.targetMinutes} min` : '25 min'} • {focus.active?.category || 'Deep Work'}
-            </div>
+        <Panel go={setActiveTab} label="Calendar" icon={<Calendar size={17} />} title="Calendar" right={<span style={{ display: 'flex', gap: 4, alignItems: 'center' }}><button type="button" className="btn btn-secondary btn-icon btn-xs" aria-label="Previous month" onClick={() => setCalMonth(subMonths(calMonth, 1))}>‹</button><strong className="dash-sub num" style={{ minWidth: 78, textAlign: 'center' }}>{format(calMonth, 'MMM yyyy')}</strong><button type="button" className="btn btn-secondary btn-icon btn-xs" aria-label="Next month" onClick={() => setCalMonth(subMonths(calMonth, -1))}>›</button></span>}>
+          <div className="dash-cal" role="grid" aria-label={format(calMonth, 'MMMM yyyy')}>
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={i} className="subtitle dash-cal-h">{d}</span>)}
+            {monthDays.map((d, i) => d ? (
+              <button type="button" key={i} onClick={() => setActiveTab('calendar')} className={`dash-cal-d ${isSameDay(d, now) ? 'is-today' : ''}`} aria-label={format(d, 'EEEE, MMM d')}>{d.getDate()}{extra.marked.has(format(d, 'yyyy-MM-dd')) && <i aria-hidden="true" />}</button>
+            ) : <span key={i} />)}
           </div>
-          {focus.active && <button type="button" className="btn btn-xs" style={{ background: 'transparent', color: 'inherit', border: '1px solid currentColor' }} onClick={focus.finish}>Finish</button>}
-        </div>
+        </Panel>
+
+        <Panel go={setActiveTab} label="Workspace and active projects" icon={<FileText size={17} />} title="Workspace / Projects" sub="Your ongoing work" action={{ label: 'View All', to: 'workspace' }}>
+          {extra.proj.length === 0 && !latestNote ? <p className="subtitle">No active projects or notes yet. Open Workspace to start one.</p> : (
+            <ul className="dash-list">
+              {extra.proj.map(({ p, pct }) => (
+                <li key={p.id} className="dash-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="dash-row-title">{p.name}</span><span className="num dash-sub">{pct}%</span></div>
+                  <div className="progress-bar-track" style={{ height: 5 }}><div style={{ width: `${pct}%`, height: '100%', background: p.color || 'var(--accent-primary)', borderRadius: 999 }} /></div>
+                </li>
+              ))}
+              {latestNote && <li className="dash-row"><FileText size={14} aria-hidden="true" /><div style={{ flex: 1, minWidth: 0 }}><div className="dash-row-title">{latestNote.title || 'Untitled'}</div><div className="subtitle dash-sub">Latest note · {relativeTime(latestNote.updatedAt)}</div></div></li>}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel go={setActiveTab} label="Smart insights" icon={<Zap size={17} />} title="Smart Insights / AI Analyst" sub="Personalized recommendations" action={{ label: 'Analyze', to: 'insights' }}>
+          <ul className="dash-list">
+            {extra.insights.map((i) => (
+              <li key={i.k}><button type="button" className="dash-insight" onClick={() => setActiveTab('insights')}><span className="dash-insight-icon">{i.icon}</span><span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}><strong>{i.k}</strong><span className="subtitle dash-sub" style={{ display: 'block' }}>{i.t}</span></span><ChevronRight size={15} aria-hidden="true" /></button></li>
+            ))}
+          </ul>
+        </Panel>
       </div>
 
       <AddHabitModal isOpen={habitModal} onClose={() => setHabitModal(false)} habitToEdit={habitToEdit} />

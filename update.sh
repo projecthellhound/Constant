@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Habit OS — Automated Repository Update & Maintenance Script
+# Constant — Automated Repository Update & Maintenance Script
 # Performs git synchronization, updates dependencies, rebuilds bundles,
 # and verifies terminal command integration.
 # ==============================================================================
@@ -32,12 +32,14 @@ npm install --no-fund --quiet
 echo -e "\n${BOLD}[3/4] Rebuilding Production Bundle...${NC}"
 npm run build
 
-echo -e "\n${BOLD}[4/4] Verifying Terminal 'Habit' Command Integration...${NC}"
-chmod +x bin/Habit
+echo -e "\n${BOLD}[4/4] Verifying the Constant launcher...${NC}"
+chmod +x bin/constant bin/Habit desktop/register-launcher.sh
 USER_BIN="$HOME/.local/bin"
 mkdir -p "$USER_BIN"
+ln -sf "$SCRIPT_DIR/bin/constant" "$USER_BIN/constant"
 ln -sf "$SCRIPT_DIR/bin/Habit" "$USER_BIN/Habit"
+[ "$(uname -s)" = "Linux" ] && bash "$SCRIPT_DIR/desktop/register-launcher.sh"
 
 echo -e "\n${GREEN}${BOLD}===================================================================="
-echo "  ✓ HABIT OS UPDATED SUCCESSFULLY!"
+echo "  ✓ CONSTANT UPDATED SUCCESSFULLY!"
 echo "====================================================================\n${NC}"

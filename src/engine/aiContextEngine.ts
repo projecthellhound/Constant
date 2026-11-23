@@ -122,7 +122,7 @@ export async function generateBuiltinAnalyticalResponse(
   );
 
   if (isGreeting) {
-    let text = `${toneHeader}Hello! 👋 I am your **AI Productivity Analyst** for **Habit OS**.\n\n`;
+    let text = `${toneHeader}Hello! 👋 I am your **AI Productivity Analyst** for **Constant**.\n\n`;
     text += `I can help you analyze your habit specifications, task workloads, calendar schedules, and daily review snapshots.\n\n`;
     text += `**What would you like to explore today?**\n`;
     text += `* Ask *"Analyze Today"* for a complete performance summary.\n`;

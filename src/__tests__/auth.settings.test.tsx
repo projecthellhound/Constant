@@ -100,11 +100,16 @@ describe('login portal', () => {
 describe('Settings', () => {
   const renderSettings = () => render(<ThemeProvider><SettingsView /></ThemeProvider>);
 
-  it('opens on Profile with details, password and database operations; AI + Appearance are one click away', async () => {
+  it('opens on Profile with details, password, nested notifications and database operations; AI + Appearance are one click away', async () => {
     await seedAccount();
     renderSettings();
     expect((await screen.findByRole('tab', { name: /Profile/ })).getAttribute('aria-selected')).toBe('true');
-    for (const l of ['Name', 'Gender', 'Email address', 'Date of birth', 'Short description', 'Current password', 'New password']) expect(screen.getByLabelText(l)).toBeTruthy();
+    for (const l of ['Full name', 'Gender', 'Email address', 'Phone number', 'Date of birth', 'Occupation / profession', 'Residential address', 'City', 'State / region', 'Country', 'Personal biography']) expect(screen.getByLabelText(l)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Upload picture/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Change password/ })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: /Notifications/ })).toBeNull(); // merged into Profile
+    const notif = screen.getByLabelText('Daily task summary'), profileSec = screen.getByLabelText('Profile details');
+    expect(profileSec.compareDocumentPosition(notif) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     for (const b of [/Extract data/, /Restore data/, /Clear all data/]) expect(screen.getByRole('button', { name: b })).toBeTruthy();
     // order: profile details -> password -> database operations (at the bottom)
     const prof = screen.getByLabelText('Profile details'), db_ = screen.getByLabelText('Database operations');
@@ -124,20 +129,25 @@ describe('Settings', () => {
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'new@example.com' } });
     fireEvent.change(screen.getByLabelText('Gender'), { target: { value: 'Female' } });
     fireEvent.change(screen.getByLabelText('Date of birth'), { target: { value: '1999-04-02' } });
-    fireEvent.change(screen.getByLabelText('Short description'), { target: { value: 'Security learner' } });
+    fireEvent.change(screen.getByLabelText('Personal biography'), { target: { value: 'Security learner' } });
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '+91 98765 43210' } });
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Chennai' } });
+    fireEvent.change(screen.getByLabelText('Occupation / profession'), { target: { value: 'Security engineer' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
-    await waitFor(async () => expect(await db.settings.get('default')).toMatchObject({ email: 'new@example.com', gender: 'Female', dob: '1999-04-02', bio: 'Security learner' }));
+    await waitFor(async () => expect(await db.settings.get('default')).toMatchObject({ email: 'new@example.com', gender: 'Female', dob: '1999-04-02', bio: 'Security learner', phone: '+91 98765 43210', city: 'Chennai', occupation: 'Security engineer' }));
   });
 
   it('changes the password only with the correct current password', async () => {
     await seedAccount();
     renderSettings();
+    fireEvent.click(await screen.findByRole('button', { name: /Change password/ }));
     fireEvent.change(await screen.findByLabelText('Current password'), { target: { value: 'wrong-one' } });
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'another-pass-1' } });
-    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'another-pass-1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect((await screen.findByRole('alert')).textContent).toMatch(/incorrect/);
     fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'correct-horse' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.change(await screen.findByLabelText('New password'), { target: { value: 'another-pass-1' } });
+    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'another-pass-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
     expect(await screen.findByText(/Password updated/)).toBeTruthy();
     expect(await checkPassword('another-pass-1')).toBe(true);

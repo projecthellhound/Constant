@@ -343,6 +343,14 @@ export interface AppSettings {
   email?: string;
   dob?: string;
   bio?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  occupation?: string;
+  /** Profile picture as a small (≤256px) JPEG data URL, stored on this device only. */
+  avatar?: string;
   /** Salted PBKDF2 hash of the account password (see src/auth). Never stored in plain text. */
   passwordHash?: string;
   passwordSalt?: string;

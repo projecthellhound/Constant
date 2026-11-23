@@ -8,7 +8,7 @@ const LEGACY_KEYS = ['subtasks', 'todoLists', 'todoItems', 'wishlistItems', 'che
 
 /** Every table in the database, so new tables can never be silently left out of a backup. */
 export async function exportAllTables(): Promise<Record<string, unknown>> {
-  const out: Record<string, unknown> = { version: BACKUP_VERSION, app: 'Habit OS', exportedAt: new Date().toISOString() };
+  const out: Record<string, unknown> = { version: BACKUP_VERSION, app: 'Constant', exportedAt: new Date().toISOString() };
   for (const table of db.tables) {
     out[table.name] = await table.toArray();
   }

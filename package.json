@@ -1,8 +1,8 @@
 {
-  "name": "habit-os",
+  "name": "constant",
   "private": true,
   "version": "1.0.0",
-  "description": "Minimalist Local-First Personal Productivity & Habit Operating System with Verified Focus & AI Analyst",
+  "description": "Constant — local-first personalized routine tracker: habits, tasks, focus, finance and an AI analyst",
   "type": "module",
   "main": "electron/main.js",
   "author": "Project Hellhound <project-hellhound-org>",
@@ -25,8 +25,8 @@
     "mobile:ios": "npm run mobile:sync && cap open ios"
   },
   "build": {
-    "appId": "com.projecthellhound.habitos",
-    "productName": "CONSTANT",
+    "appId": "com.projecthellhound.constant",
+    "productName": "Constant",
     "copyright": "Copyright © 2026 Project Hellhound",
     "directories": {
       "output": "dist_electron",
@@ -46,7 +46,12 @@
       "icon": "build/icons",
       "category": "Utility",
       "maintainer": "Project Hellhound",
-      "synopsis": "Habit, task and focus tracker"
+      "synopsis": "Personalized routine tracker",
+      "executableName": "constant",
+      "desktop": {
+        "StartupWMClass": "constant",
+        "Name": "Constant"
+      }
     },
     "win": {
       "target": [
@@ -60,7 +65,7 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "shortcutName": "CONSTANT"
+      "shortcutName": "Constant"
     },
     "mac": {
       "target": [
@@ -69,7 +74,8 @@
       ],
       "icon": "build/icon.icns",
       "category": "public.app-category.productivity"
-    }
+    },
+    "executableName": "constant"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",
@@ -121,5 +127,6 @@
   "allowScripts": {
     "electron": true,
     "electron-winstaller": false
-  }
+  },
+  "productName": "Constant"
 }

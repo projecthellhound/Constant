@@ -12,9 +12,9 @@ if os.path.exists("requirements.txt"):
                 requirements.append(line)
 
 setup(
-    name="habit-os",
+    name="constant",
     version="1.0.0",
-    description="Forest Flow Habit OS & Task Management Application",
+    description="Constant — Personalized Routine Tracker",
     author="Alpha4",
     packages=find_packages(),
     py_modules=["validate_env"],

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Habit OS — Diagnostic Health & System Audit Tool (doctor.sh)
+# Constant — Diagnostic Health & System Audit Tool (doctor.sh)
 # Inspects environment health, dependency versions, security vulnerabilities,
 # compilation status, and local/cloud AI services.
 # ==============================================================================
@@ -17,7 +17,7 @@ cd "$SCRIPT_DIR"
 
 echo -e "${BOLD}${CYAN}"
 echo "===================================================================="
-echo "       HABIT OS — SYSTEM DIAGNOSTIC HEALTH CHECK (DOCTOR)"
+echo "       CONSTANT — SYSTEM DIAGNOSTIC HEALTH CHECK (DOCTOR)"
 echo "===================================================================="
 echo -e "${NC}"
 
@@ -75,11 +75,14 @@ else
 fi
 
 # 5. Terminal CLI Command & PATH Integration
-echo -e "\n${BOLD}--- 5. Terminal Execution Integration ('Habit') ---${NC}"
-if [ -L "$HOME/.local/bin/Habit" ] || [ -f "$HOME/.local/bin/Habit" ]; then
-    echo -e "${GREEN}[PASS] Terminal Command 'Habit' registered in $HOME/.local/bin/Habit${NC}"
+echo -e "\n${BOLD}--- 5. Launcher & Icon Integration ---${NC}"
+if [ -L "$HOME/.local/bin/constant" ] || [ -f "$HOME/.local/bin/constant" ]; then
+    echo -e "${GREEN}[PASS] Terminal command 'constant' registered in $HOME/.local/bin/constant${NC}"
 else
-    echo -e "${YELLOW}[WARN] 'Habit' command symlink missing in $HOME/.local/bin/Habit. Run ./install.sh to fix.${NC}"
+    echo -e "${YELLOW}[WARN] 'constant' command missing. Run ./install.sh to fix.${NC}"
+fi
+if [ "$(uname -s)" = "Linux" ]; then
+    if [ -f "$HOME/.local/share/applications/constant.desktop" ]; then echo -e "${GREEN}[PASS] Application menu entry with icon: constant.desktop${NC}"; else echo -e "${YELLOW}[WARN] No menu/desktop icon yet. Run: bash desktop/register-launcher.sh${NC}"; fi
 fi
 
 # 6. AI Engine Services Check

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Habit OS — Clean Uninstallation & Artifact Cleanup Script
+# Constant — Clean Uninstallation & Artifact Cleanup Script
 # Removes symlinks from executable PATH and cleans build artifacts.
 # ==============================================================================
 
@@ -19,21 +19,20 @@ echo "         HABIT OS — UNINSTALLATION & CLEANUP TOOL"
 echo "===================================================================="
 echo -e "${NC}"
 
-read -p "Are you sure you want to uninstall the 'Habit' terminal launcher and clean build outputs? (y/N): " confirm
+read -p "Are you sure you want to uninstall the Constant launcher and clean build outputs? (y/N): " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
     echo "Uninstallation cancelled."
     exit 0
 fi
 
 echo -e "\n[*] Removing terminal launcher symlinks..."
-rm -f "$HOME/.local/bin/Habit"
-if [ -w "/usr/local/bin/Habit" ]; then
-    rm -f "/usr/local/bin/Habit"
-fi
+rm -f "$HOME/.local/bin/Habit" "$HOME/.local/bin/constant" "$HOME/.local/share/applications/constant.desktop" "$HOME/Desktop/Constant.desktop"
+for s in 16 24 32 48 64 128 256 512; do rm -f "$HOME/.local/share/icons/hicolor/${s}x${s}/apps/constant.png"; done
+for f in /usr/local/bin/Habit /usr/local/bin/constant; do [ -w "$f" ] && rm -f "$f"; done
 
 echo -e "[*] Cleaning build output directories (dist, dist_electron)..."
 rm -rf dist dist_electron
 
 echo -e "\n${GREEN}${BOLD}===================================================================="
-echo "  ✓ HABIT OS UNINSTALLED & CLEANED SUCCESSFULLY"
+echo "  ✓ CONSTANT UNINSTALLED & CLEANED SUCCESSFULLY"
 echo "====================================================================\n${NC}"

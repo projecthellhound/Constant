@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Constant
+GenericName=Routine Tracker
+Comment=Personalized Routine Tracker — habits, tasks, focus and finance
+Exec="@LAUNCHER@"
+Icon=constant
+Terminal=false
+Categories=Office;ProjectManagement;
+StartupNotify=true
+StartupWMClass=constant
+Keywords=habit;tasks;productivity;routine;

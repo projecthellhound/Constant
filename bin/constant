@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Constant — launcher. Resolves the project folder even when started through a symlink.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT" || { echo "[!] Could not enter $PROJECT_ROOT" >&2; exit 1; }
+
+if [ ! -f "$PROJECT_ROOT/dist/index.html" ]; then
+  echo "[*] Building Constant (first run)..."
+  npm run build >/dev/null 2>&1 || { echo "[!] Build failed. Run 'npm install && npm run build' to see why." >&2; exit 1; }
+fi
+
+# First run only: fetch the Electron runtime if npm skipped its download step.
+if [ ! -x "$PROJECT_ROOT/node_modules/electron/dist/electron" ] && [ -f "$PROJECT_ROOT/node_modules/electron/install.js" ]; then
+  echo "[*] Downloading the Electron runtime (one time, ~100 MB). Constant opens when this finishes..."
+  node "$PROJECT_ROOT/node_modules/electron/install.js" || { echo "[!] Electron download failed. Check your internet connection and run: node node_modules/electron/install.js" >&2; exit 1; }
+fi
+
+# Build the command as an array so folders with spaces (e.g. "Constant Docs") work.
+if [ -x "$PROJECT_ROOT/node_modules/.bin/electron" ]; then
+  CMD=("$PROJECT_ROOT/node_modules/.bin/electron")
+else
+  CMD=(npx electron)
+fi
+CMD+=("$PROJECT_ROOT" --class=constant "$@")   # app folder (not the file) so Electron reads package.json: name, version, icon
+
+# --class makes the window manager group Constant under its own icon (matches StartupWMClass in constant.desktop).
+# Known-harmless NVIDIA/VA-API driver chatter is filtered out of the terminal; real errors still show.
+if [ -t 2 ]; then
+  "${CMD[@]}" 2> >(grep --line-buffered -v -E 'nv_gbm|nv_common_gbm|pci id for fd|vaInitialize failed|gpu_persistent_cache|vaapi_wrapper' >&2)
+else
+  exec "${CMD[@]}"
+fi
